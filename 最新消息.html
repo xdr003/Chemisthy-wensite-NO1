@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub CSV阅读器</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #e6f7ff;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GitHub CSV文件阅读器</h1>
+        
+        <div class="info">
+            <p><strong>仓库:</strong> Joey862/Joey.github.io</p>
+            <p><strong>文件:</strong> 信息.csv</p>
+            <p><strong>分支:</strong> main</p>
+        </div>
+        
+        <button id="loadBtn">加载CSV数据</button>
+        
+        <div id="status"></div>
+        
+        <div id="dataContainer">
+            <table id="dataTable">
+                <!-- 数据将在这里动态加载 -->
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loadBtn').addEventListener('click', async function() {
+            const statusDiv = document.getElementById('status');
+            const table = document.getElementById('dataTable');
+            
+            showStatus('正在加载数据...', '');
+            
+            try {
+                // GitHub API请求URL
+                const url = 'https://api.github.com/repos/Joey862/Joey.github.io/contents/信息.csv?ref=main';
+                
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'User-Agent': 'GitHubCSVReader/1.0'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`请求失败: ${response.status} ${response.statusText}`);
+                }
+                
+                const fileData = await response.json();
+                
+                // 解码Base64内容
+                const content = atob(fileData.content.replace(/\s/g, ''));
+                
+                // 解析CSV数据
+                const lines = content.split('\n');
+                const headers = lines[0].split(',');
+                const rows = lines.slice(1);
+                
+                // 清空表格
+                table.innerHTML = '';
+                
+                // 创建表头
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                
+                headers.forEach(header => {
+                    const th = document.createElement('th');
+                    th.textContent = header.replace(/"/g, '');
+                    headerRow.appendChild(th);
+                });
+                
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+                
+                // 创建表体
+                const tbody = document.createElement('tbody');
+                
+                rows.forEach(row => {
+                    if (row.trim()) {
+                        const tr = document.createElement('tr');
+                        const cells = row.split(',');
+                        
+                        cells.forEach(cell => {
+                            const td = document.createElement('td');
+                            td.textContent = cell.replace(/"/g, '');
+                            tr.appendChild(td);
+                        });
+                        
+                        tbody.appendChild(tr);
+                    }
+                });
+                
+                table.appendChild(tbody);
+                
+                showStatus(`成功加载 ${rows.length} 条数据`, 'success');
+            } catch (error) {
+                showStatus(`错误: ${error.message}`, 'error');
+                console.error('加载数据时出错:', error);
+            }
+        });
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+            
+            if (type === 'success') {
+                statusDiv.className = 'success';
+            } else if (type === 'error') {
+                statusDiv.className = 'error';
+            } else {
+                statusDiv.className = '';
+            }
+        }
+    </script>
+</body>
+</html>

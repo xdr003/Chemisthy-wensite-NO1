@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>化学结构编辑器优化版</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            touch-action: manipulation;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-color: white;
+        }
+        #canvas2d, #canvas3d {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #canvas3d {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 10px;
+            background-color: #333;
+            color: white;
+        }
+        .control-group {
+            flex: 1;
+            min-width: 120px;
+        }
+        button {
+            width: 100%;
+            padding: 8px;
+            margin: 2px 0;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button.active {
+            background-color: #0078d7;
+        }
+        button.warning {
+            background-color: #d7d700;
+            color: black;
+        }
+        button.danger {
+            background-color: #d70000;
+        }
+        #status {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-container">
+            <canvas id="canvas2d"></canvas>
+            <canvas id="canvas3d"></canvas>
+            <div id="status">模式: 2D绘制 | 点击添加原子 | 选择两个原子后点击连接按钮</div>
+        </div>
+        <div id="controls">
+            <div class="control-group">
+                <h3>原子类型</h3>
+                <button class="active" onclick="setAtomType('C')">碳 (C)</button>
+                <button onclick="setAtomType('O')">氧 (O)</button>
+                <button onclick="setAtomType('N')">氮 (N)</button>
+                <button onclick="setAtomType('H')">氢 (H)</button>
+            </div>
+            <div class="control-group">
+                <h3>键类型</h3>
+                <button class="active" onclick="setBondType(1)">单键</button>
+                <button onclick="setBondType(2)">双键</button>
+                <button onclick="setBondType(3)">三键</button>
+            </div>
+            <div class="control-group">
+                <h3>操作</h3>
+                <button onclick="connectAtoms()">连接原子</button>
+                <button onclick="clearSelection()">取消选择</button>
+                <button onclick="toggle3DView()">3D视图</button>
+                <button onclick="addHydrogens()">自动加氢</button>
+                <button class="danger" onclick="deleteSelected()">删除选中</button>
+                <button onclick="clearCanvas()">清空</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // 初始化变量
+        let atoms = [];
+        let bonds = [];
+        let selectedAtoms = [];
+        let currentAtomType = 'C';
+        let currentBondType = 1;
+        let is3DView = false;
+
+        // 原子属性
+        const atomProperties = {
+            'C': { color: '#000000', radius: 15, valence: 4 },
+            'O': { color: '#FF0000', radius: 15, valence: 2 },
+            'N': { color: '#0000FF', radius: 15, valence: 3 },
+            'H': { color: '#FFFFFF', radius: 10, valence: 1 }
+        };
+
+        // 键颜色映射
+        const bondColors = {
+            1: '#FF0000',  // 单键 - 红色
+            2: '#00FF00',  // 双键 - 绿色
+            3: '#0000FF'   // 三键 - 蓝色
+        };
+
+        // 初始化2D画布
+        const canvas2d = document.getElementById('canvas2d');
+        const ctx2d = canvas2d.getContext('2d');
+        
+        // 初始化3D场景
+        const canvas3d = document.getElementById('canvas3d');
+        const renderer3d = new THREE.WebGLRenderer({ 
+            canvas: canvas3d,
+            antialias: true,
+            alpha: true
+        });
+        const scene3d = new THREE.Scene();
+        scene3d.background = new THREE.Color(0xf0f0f0);
+        const camera3d = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+        const controls3d = new THREE.OrbitControls(camera3d, canvas3d);
+        controls3d.enableDamping = true;
+        controls3d.dampingFactor = 0.05;
+
+        // 响应式调整画布大小
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            canvas2d.width = width;
+            canvas2d.height = height;
+            
+            renderer3d.setSize(width, height);
+            camera3d.aspect = width / height;
+            camera3d.updateProjectionMatrix();
+            
+            draw2DScene();
+            if (is3DView) update3DScene();
+        }
+
+        // 绘制2D场景
+        function draw2DScene() {
+            ctx2d.clearRect(0, 0, canvas2d.width, canvas2d.height);
+            
+            // 绘制键
+            bonds.forEach(bond => {
+                const atom1 = atoms[bond.atom1];
+                const atom2 = atoms[bond.atom2];
+                
+                ctx2d.beginPath();
+                ctx2d.moveTo(atom1.x, atom1.y);
+                ctx2d.lineTo(atom2.x, atom2.y);
+                ctx2d.lineWidth = bond.type * 2;
+                ctx2d.strokeStyle = bondColors[bond.type];
+                ctx2d.stroke();
+            });
+            
+            // 绘制原子
+            atoms.forEach((atom, index) => {
+                const props = atomProperties[atom.type];
+                
+                ctx2d.beginPath();
+                ctx2d.arc(atom.x, atom.y, props.radius, 0, Math.PI * 2);
+                ctx2d.fillStyle = props.color;
+                ctx2d.fill();
+                ctx2d.strokeStyle = '#000000';
+                ctx2d.lineWidth = 1;
+                ctx2d.stroke();
+                
+                ctx2d.fillStyle = atom.type === 'H' ? '#000000' : '#FFFFFF';
+                ctx2d.font = 'bold 12px Arial';
+                ctx2d.textAlign = 'center';
+                ctx2d.textBaseline = 'middle';
+                ctx2d.fillText(atom.type, atom.x, atom.y);
+                
+                // 高亮选中的原子
+                if (selectedAtoms.includes(index)) {
+                    ctx2d.beginPath();
+                    ctx2d.arc(atom.x, atom.y, props.radius + 3, 0, Math.PI * 2);
+                    ctx2d.strokeStyle = '#FF0000';
+                    ctx2d.lineWidth = 2;
+                    ctx2d.stroke();
+                }
+            });
+        }
+
+        // 更新3D场景
+        function update3DScene() {
+            // 清除现有3D对象
+            while(scene3d.children.length > 0) { 
+                scene3d.remove(scene3d.children[0]);
+            }
+            
+            // 添加光源
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene3d.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7);
+            scene3d.add(directionalLight);
+            
+            // 创建原子和键
+            atoms.forEach(atom => {
+                const props = atomProperties[atom.type];
+                const geometry = new THREE.SphereGeometry(props.radius / 15, 16, 16);
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: new THREE.Color(props.color),
+                    specular: 0x111111,
+                    shininess: 30
+                });
+                const sphere = new THREE.Mesh(geometry, material);
+                sphere.position.set(
+                    (atom.x - canvas2d.width / 2) / 30,
+                    (canvas2d.height / 2 - atom.y) / 30,
+                    0
+                );
+                scene3d.add(sphere);
+            });
+            
+            // 创建3D键
+            bonds.forEach(bond => {
+                const atom1 = atoms[bond.atom1];
+                const atom2 = atoms[bond.atom2];
+                
+                const x1 = (atom1.x - canvas2d.width / 2) / 30;
+                const y1 = (canvas2d.height / 2 - atom1.y) / 30;
+                const x2 = (atom2.x - canvas2d.width / 2) / 30;
+                const y2 = (canvas2d.height / 2 - atom2.y) / 30;
+                
+                // 计算中点
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
+                
+                // 计算键长度和角度
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx);
+                
+                // 创建键几何体
+                const geometry = new THREE.CylinderGeometry(
+                    0.05 * bond.type, 
+                    0.05 * bond.type, 
+                    length - 0.2, 
+                    8
+                );
+                geometry.rotateZ(Math.PI / 2);
+                
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: new THREE.Color(bondColors[bond.type]),
+                    specular: 0x111111,
+                    shininess: 30
+                });
+                
+                const cylinder = new THREE.Mesh(geometry, material);
+                cylinder.position.set(midX, midY, 0);
+                cylinder.rotation.z = angle;
+                
+                scene3d.add(cylinder);
+            });
+            
+            // 自动调整相机位置
+            if (atoms.length > 0) {
+                const box = new THREE.Box3().setFromObject(scene3d);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                
+                camera3d.position.copy(center);
+                camera3d.position.z += size.length() * 1.5;
+                controls3d.target.copy(center);
+            }
+        }
+
+        // 切换3D视图
+        function toggle3DView() {
+            is3DView = !is3DView;
+            
+            if (is3DView) {
+                canvas2d.style.opacity = '0';
+                canvas2d.style.pointerEvents = 'none';
+                canvas3d.style.opacity = '1';
+                canvas3d.style.pointerEvents = 'auto';
+                update3DScene();
+                document.getElementById('status').textContent = '模式: 3D查看 | 拖动旋转 | 双指缩放';
+            } else {
+                canvas2d.style.opacity = '1';
+                canvas2d.style.pointerEvents = 'auto';
+                canvas3d.style.opacity = '0';
+                canvas3d.style.pointerEvents = 'none';
+                document.getElementById('status').textContent = '模式: 2D绘制 | 点击添加原子 | 选择两个原子后点击连接按钮';
+            }
+        }
+
+        // 设置当前原子类型
+        function setAtomType(type) {
+            currentAtomType = type;
+            
+            // 更新按钮样式
+            document.querySelectorAll('.control-group:nth-child(1) button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(type)) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        // 设置当前键类型
+        function setBondType(type) {
+            currentBondType = type;
+            
+            // 更新按钮样式
+            document.querySelectorAll('.control-group:nth-child(2) button').forEach(btn => {
+                btn.classList.remove('active');
+                if (
+                    (type === 1 && btn.textContent.includes('单键')) ||
+                    (type === 2 && btn.textContent.includes('双键')) ||
+                    (type === 3 && btn.textContent.includes('三键'))
+                ) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        // 查找点击位置的原子
+        function findAtomAt(x, y) {
+            for (let i = 0; i < atoms.length; i++) {
+                const atom = atoms[i];
+                const props = atomProperties[atom.type];
+                const dx = x - atom.x;
+                const dy = y - atom.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance <= props.radius) {
+                    return i;
+                }
+            }
+            return null;
+        }
+
+        // 自动添加氢原子
+        function addHydrogens() {
+            atoms.forEach((atom, index) => {
+                const props = atomProperties[atom.type];
+                
+                // 计算当前原子已形成的键数
+                const bondCount = bonds.reduce((count, bond) => {
+                    return count + (bond.atom1 === index || bond.atom2 === index ? bond.type : 0);
+                }, 0);
+                
+                // 计算需要添加的氢原子数量
+                const neededHydrogens = props.valence - bondCount;
+                
+                if (neededHydrogens > 0) {
+                    for (let i = 0; i < neededHydrogens; i++) {
+                        const angle = (i / neededHydrogens) * Math.PI * 2;
+                        const hX = atom.x + Math.cos(angle) * 30;
+                        const hY = atom.y + Math.sin(angle) * 30;
+                        
+                        const hIndex = atoms.length;
+                        atoms.push({
+                            type: 'H',
+                            x: hX,
+                            y: hY
+                        });
+                        
+                        bonds.push({
+                            atom1: index,
+                            atom2: hIndex,
+                            type: 1
+                        });
+                    }
+                }
+            });
+            
+            draw2DScene();
+            if (is3DView) update3DScene();
+        }
+
+        // 连接选中的原子
+        function connectAtoms() {
+            if (selectedAtoms.length !== 2) {
+                alert("请先选择两个原子");
+                return;
+            }
+            
+            const [atom1, atom2] = selectedAtoms;
+            
+            // 检查是否已存在相同的键
+            const existingBond = bonds.find(bond => 
+                (bond.atom1 === atom1 && bond.atom2 === atom2) ||
+                (bond.atom1 === atom2 && bond.atom2 === atom1)
+            );
+            
+            if (!existingBond) {
+                // 添加新键
+                bonds.push({
+                    atom1: atom1,
+                    atom2: atom2,
+                    type: currentBondType
+                });
+            }
+            
+            selectedAtoms = [];
+            draw2DScene();
+            if (is3DView) update3DScene();
+        }
+
+        // 清空选择
+        function clearSelection() {
+            selectedAtoms = [];
+            draw2DScene();
+        }
+
+        // 删除选中的原子
+        function deleteSelected() {
+            if (selectedAtoms.length === 0) {
+                alert("请先选择要删除的原子");
+                return;
+            }
+            
+            // 按从大到小排序，避免删除时索引变化
+            selectedAtoms.sort((a, b) => b - a);
+            
+            selectedAtoms.forEach(atomIndex => {
+                // 删除与该原子相关的键
+                bonds = bonds.filter(bond => 
+                    bond.atom1 !== atomIndex && bond.atom2 !== atomIndex
+                );
+                
+                // 删除原子
+                atoms.splice(atomIndex, 1);
+                
+                // 更新键的索引
+                bonds.forEach(bond => {
+                    if (bond.atom1 > atomIndex) bond.atom1--;
+                    if (bond.atom2 > atomIndex) bond.atom2--;
+                });
+            });
+            
+            selectedAtoms = [];
+            draw2DScene();
+            if (is3DView) update3DScene();
+        }
+
+        // 清空画布
+        function clearCanvas() {
+            atoms = [];
+            bonds = [];
+            selectedAtoms = [];
+            draw2DScene();
+            if (is3DView) update3DScene();
+        }
+
+        // 处理点击事件
+        function handleClick(x, y) {
+            const clickedAtom = findAtomAt(x, y);
+            
+            if (clickedAtom !== null) {
+                // 点击了现有原子
+                if (selectedAtoms.includes(clickedAtom)) {
+                    // 如果已经选中，取消选择
+                    selectedAtoms = selectedAtoms.filter(i => i !== clickedAtom);
+                } else {
+                    // 添加新选择
+                    selectedAtoms.push(clickedAtom);
+                    
+                    // 限制最多选择两个原子
+                    if (selectedAtoms.length > 2) {
+                        selectedAtoms.shift();
+                    }
+                }
+            } else {
+                // 点击空白处添加新原子
+                atoms.push({
+                    type: currentAtomType,
+                    x: x,
+                    y: y
+                });
+                selectedAtoms = [atoms.length - 1];
+            }
+            
+            draw2DScene();
+        }
+
+        // 初始化事件监听
+        function initEventListeners() {
+            // 鼠标事件
+            canvas2d.addEventListener('mousedown', (e) => {
+                const rect = canvas2d.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                handleClick(x, y);
+            });
+            
+            // 触摸事件
+            canvas2d.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const rect = canvas2d.getBoundingClientRect();
+                const touch = e.touches[0];
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                handleClick(x, y);
+            }, { passive: false });
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            if (is3DView) {
+                controls3d.update();
+                renderer3d.render(scene3d, camera3d);
+            }
+        }
+
+        // 初始化
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            initEventListeners();
+            animate();
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
