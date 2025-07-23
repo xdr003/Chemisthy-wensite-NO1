@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据详情</title>
+    <style>
+        /* 复古风格CSS */
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #f0e6cc;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border: 1px solid #8b4513;
+            box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            color: #8b4513;
+            text-align: center;
+            border-bottom: 2px solid #8b4513;
+            padding-bottom: 10px;
+        }
+        
+        .detail-content {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f3e9;
+            border-left: 3px solid #8b4513;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #8b4513;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="detail-title">数据详情</h1>
+        
+        <div id="detail-content" class="detail-content">
+            <!-- 详情内容将通过JavaScript动态加载 -->
+        </div>
+        
+        <a href="index.html" class="back-link">← 返回列表</a>
+    </div>
+
+    <script>
+        // 从URL获取参数
+        function getParameterByName(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+        
+        // 示例数据（应与主页面相同）
+        const dataItems = [
+            {
+                id: 1,
+                title: "硝酸甘油酯",
+                description: "一种烈性炸药",
+                details: "硝酸甘油酯的制作过程如下：1-丙醇在浓硫酸作用下发生消去反应生成丙烯(CH₃CHCH₂)丙烯在500℃条件下与氯气发生取代反应生成3-氯丙烯(CH₂CHCH₂Cl)3-氯丙烯与氯气发生加成反应生成1,2,3-三氯丙烷(ClCH₂CHClCH₂Cl)1,2,3-三氯丙烷在碱性条件下水解生成甘油(HOCH₂CHOHCH₂OH)最后甘油与浓硝酸在浓硫酸催化下于0-5℃低温条件进行酯化反应，生成三硝酸甘油酯(C₃H₅N₃O₉)。"
+            },
+            {
+                id: 2,
+                title: "七氧化二锰",
+                description: "一种无机炸药",
+                details: "旋转拨号电话是20世纪中期广泛使用的电话类型，通过旋转拨号盘输入号码。七氧化二锰（化学式Mn₂O₇）是一种无机化合物，作为锰的最高价氧化物（+7价），它既是强氧化剂又是酸性氧化物，常温下呈墨绿色油状液体，在反射光下显绿色而透射光下呈红色。其熔点5.9℃，沸点59℃，密度2.79 g/cm³，易溶于四氯化碳，遇水剧烈反应生成高锰酸（HMnO₄）。该化合物结构由两个共用顶点的MnO₄四面体组成（O₃Mn-O-MnO₃），具有非极性键特性。化学性质极不稳定，受热或遇有机物易爆炸分解为二氧化锰和氧气，同时释放臭氧；与浓硫酸反应生成MnO₃⁺离子，与盐酸反应释放氯气。工业上通过高锰酸钾与冷浓硫酸反应制取，主要用于测定矿石中铁含量、制备锂电极材料及功能性材料增强剂。"
+            },
+         
+        ];
+        
+        // 加载详情数据
+        function loadDetail() {
+            const itemId = parseInt(getParameterByName('id'));
+            const item = dataItems.find(item => item.id === itemId);
+            
+            if (item) {
+                document.getElementById('detail-title').textContent = item.title;
+                document.getElementById('detail-content').innerHTML = `
+                    <h3>${item.title}</h3>
+                    <p><strong>简介:</strong> ${item.description}</p>
+                    <p><strong>详细信息:</strong> ${item.details}</p>
+                `;
+            } else {
+                document.getElementById('detail-content').innerHTML = `
+                    <p>未找到指定的数据项</p>
+                `;
+            }
+        }
+        
+        // 页面加载时执行
+        loadDetail();
+    </script>
+</body>
+</html>

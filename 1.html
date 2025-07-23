@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>论坛</title>
+    <style>
+        /* 复古风格CSS */
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #f0e6cc;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border: 1px solid #8b4513;
+            box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            color: #8b4513;
+            text-align: center;
+            border-bottom: 2px solid #8b4513;
+            padding-bottom: 10px;
+        }
+        
+        #search-box {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #8b4513;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .data-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #f9f3e9;
+            border-left: 3px solid #8b4513;
+        }
+        
+        .data-item h3 {
+            margin: 0 0 5px 0;
+            color: #8b4513;
+        }
+        
+        .data-item p {
+            margin: 5px 0;
+        }
+        
+        .view-link {
+            color: #8b4513;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .view-link:hover {
+            text-decoration: underline;
+        }
+        
+        .no-results {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>化学论坛</h1>
+        
+        <input type="text" id="search-box" placeholder="输入关键词搜索...">
+        
+        <div id="data-list">
+            <!-- 数据项将通过JavaScript动态加载 -->
+        </div>
+        
+        <div id="no-results" class="no-results">没有找到匹配的结果</div>
+    </div>
+
+    <script>
+        // 示例数据
+        const dataItems = [
+            {
+                id: 1,
+                title: "硝酸甘油酯制作",
+                description: "硝酸甘油酯制作",
+                details: "硝酸甘油酯的制作过程如下：1-丙醇在浓硫酸作用下发生消去反应生成丙烯(CH₃CHCH₂)丙烯在500℃条件下与氯气发生取代反应生成3-氯丙烯(CH₂CHCH₂Cl)3-氯丙烯与氯气发生加成反应生成1,2,3-三氯丙烷(ClCH₂CHClCH₂Cl)1,2,3-三氯丙烷在碱性条件下水解生成甘油(HOCH₂CHOHCH₂OH)最后甘油与浓硝酸在浓硫酸催化下于0-5℃低温条件进行酯化反应，生成三硝酸甘油酯(C₃H₅N₃O₉)。"
+            },
+            {
+                id: 2,
+                title: "七氧化二锰",
+                description: "见到有机物就炸 作者：Joey",
+                details: "一种能与有机物发生反应的无机物"
+            },
+        
+        ];
+
+        // 显示数据列表
+        function displayData(items) {
+            const dataList = document.getElementById('data-list');
+            const noResults = document.getElementById('no-results');
+            
+            dataList.innerHTML = '';
+            
+            if (items.length === 0) {
+                noResults.style.display = 'block';
+                return;
+            }
+            
+            noResults.style.display = 'none';
+            
+            items.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'data-item';
+                itemElement.innerHTML = `
+                    <h3>${item.title}</h3>
+                    <p>${item.description}</p>
+                    <a href="detail.html?id=${item.id}" class="view-link">查看详情</a>
+                `;
+                dataList.appendChild(itemElement);
+            });
+        }
+        
+        // 搜索功能
+        document.getElementById('search-box').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const filteredItems = dataItems.filter(item => 
+                item.title.toLowerCase().includes(searchTerm) || 
+                item.description.toLowerCase().includes(searchTerm)
+            );
+            displayData(filteredItems);
+        });
+        
+        // 初始加载所有数据
+        displayData(dataItems);
+    </script>
+</body>
+</html>

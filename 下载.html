@@ -1,0 +1,79 @@
+ 
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客服端下载</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .download-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            text-align: center;
+            width: 400px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        .download-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .download-btn:hover {
+            background-color: #45a049;
+        }
+        .icon {
+            font-size: 60px;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="download-container">
+        <div class="icon">📩</div>
+        <h1>下载客服端</h1>
+        <p>点击下方按钮下载最新版客服端软件，安装后网速更快。如果不成功，那么请再次尝试</p>
+        <a href="https://joey862.github.io/Joey.github.io/Joey网站.exe" class="download-btn" id="downloadBtn">立即下载</a>
+    </div>
+
+    <script>
+        // 为下载按钮添加点击事件
+        document.getElementById('downloadBtn').addEventListener('click', function(e) {
+            e.preventDefault(); // 阻止默认行为
+            
+            // 先跳转到目标网页
+            window.location.href = 'https://joey862.github.io/Joey.github.io/1/Joey网站.exe';
+            
+            // 可以在这里添加实际的下载逻辑
+            // 例如：window.open('https://www.example.com/download/client.exe');
+        });
+    </script>
+</body>
+</html>

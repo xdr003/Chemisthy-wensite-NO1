@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高级有机化合物构建器</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        #container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        #control-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            width: 300px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        .btn {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-group {
+            margin: 10px 0;
+        }
+        #compound-name {
+            font-weight: bold;
+            margin-top: 10px;
+            color: #333;
+        }
+        #rotation-controls {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <h2>高级有机化合物构建器</h2>
+        <p>点击原子按钮添加到分子中</p>
+        <div id="compound-name">当前分子: 无</div>
+        <div id="rotation-controls">
+            <button class="btn" onclick="rotateMolecule('x')">绕X轴旋转</button>
+            <button class="btn" onclick="rotateMolecule('y')">绕Y轴旋转</button>
+            <button class="btn" onclick="rotateMolecule('z')">绕Z轴旋转</button>
+        </div>
+    </div>
+    <div id="control-panel">
+        <h3>原子选择</h3>
+        <div class="btn-group">
+            <button class="btn" onclick="addAtom('C')">碳 (C)</button>
+            <button class="btn" onclick="addAtom('H')">氢 (H)</button>
+            <button class="btn" onclick="addAtom('O')">氧 (O)</button>
+            <button class="btn" onclick="addAtom('N')">氮 (N)</button>
+            <button class="btn" onclick="addAtom('Cl')">氯 (Cl)</button>
+            <button class="btn" onclick="addAtom('Br')">溴 (Br)</button>
+        </div>
+        
+        <h3>功能基团</h3>
+        <div class="btn-group">
+            <button class="btn" onclick="addBenzeneRing()">苯环</button>
+            <button class="btn" onclick="addMethylGroup()">甲基</button>
+            <button class="btn" onclick="addHydroxylGroup()">羟基</button>
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn" onclick="clearMolecule()">清除分子</button>
+            <button class="btn" onclick="centerMolecule()">居中分子</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // 初始化场景、相机和渲染器
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 15);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.getElementById('container').appendChild(renderer.domElement);
+        
+        // 添加轨道控制器
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        
+        // 添加光源
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+        
+        // 存储原子、键和分子组
+        const atoms = [];
+        const bonds = [];
+        let moleculeGroup = new THREE.Group();
+        scene.add(moleculeGroup);
+        
+        // 原子颜色映射
+        const atomColors = {
+            'C': 0x333333,  // 碳 - 黑色
+            'H': 0xffffff,  // 氢 - 白色
+            'O': 0xff0000,  // 氧 - 红色
+            'N': 0x0000ff,  // 氮 - 蓝色
+            'Cl': 0x00ff00, // 氯 - 绿色
+            'Br': 0x800080  // 溴 - 紫色
+        };
+        
+        // 原子半径映射
+        const atomRadii = {
+            'C': 0.7,
+            'H': 0.3,
+            'O': 0.66,
+            'N': 0.65,
+            'Cl': 0.8,
+            'Br': 0.9
+        };
+        
+        // 键长度映射
+        const bondLengths = {
+            'C-C': 1.54,
+            'C-H': 1.09,
+            'C-O': 1.43,
+            'C-N': 1.47,
+            'C-Cl': 1.77,
+            'C-Br': 1.94
+        };
+        
+        // 添加原子的函数
+        function addAtom(type, position = null) {
+            const geometry = new THREE.SphereGeometry(atomRadii[type], 32, 32);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: atomColors[type],
+                specular: 0x111111,
+                shininess: 30
+            });
+            
+            const atom = new THREE.Mesh(geometry, material);
+            
+            // 设置原子位置
+            if (position) {
+                atom.position.copy(position);
+            } else if (atoms.length === 0) {
+                atom.position.set(0, 0, 0);
+            } else {
+                // 将新原子放在最后一个碳原子旁边
+                const lastCarbon = [...atoms].reverse().find(a => a.userData.type === 'C');
+                if (lastCarbon) {
+                    const bondType = `C-${type}`;
+                    const length = bondLengths[bondType] || 1.5;
+                    atom.position.copy(lastCarbon.position);
+                    atom.position.x += length;
+                } else {
+                    atom.position.copy(atoms[atoms.length - 1].position);
+                    atom.position.x += 1.5;
+                }
+            }
+            
+            atom.userData = { type: type };
+            atoms.push(atom);
+            moleculeGroup.add(atom);
+            
+            // 如果多于一个原子，添加键
+            if (atoms.length > 1) {
+                addBond(atoms[atoms.length - 2], atom);
+            }
+            
+            // 更新分子名称
+            updateMoleculeName();
+            
+            // 自动聚焦新原子
+            centerMolecule();
+        }
+        
+        // 添加键的函数
+        function addBond(atom1, atom2) {
+            const distance = atom1.position.distanceTo(atom2.position);
+            const bondGeometry = new THREE.CylinderGeometry(0.1, 0.1, distance, 8);
+            const bondMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xcccccc,
+                specular: 0x111111,
+                shininess: 30
+            });
+            
+            const bond = new THREE.Mesh(bondGeometry, bondMaterial);
+            
+            // 将键放置在两个原子之间
+            bond.position.copy(atom1.position);
+            bond.position.lerp(atom2.position, 0.5);
+            
+            // 旋转键使其指向第二个原子
+            bond.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                new THREE.Vector3().subVectors(atom2.position, atom1.position).normalize()
+            );
+            
+            bonds.push(bond);
+            moleculeGroup.add(bond);
+        }
+        
+        // 添加苯环的函数
+        function addBenzeneRing() {
+            const radius = 1.4; // 苯环半径
+            const center = atoms.length > 0 ? atoms[atoms.length - 1].position : new THREE.Vector3(0, 0, 0);
+            
+            // 创建6个碳原子
+            for (let i = 0; i < 6; i++) {
+                const angle = (i * Math.PI / 3);
+                const x = center.x + radius * Math.cos(angle);
+                const y = center.y + radius * Math.sin(angle);
+                
+                const carbon = new THREE.Mesh(
+                    new THREE.SphereGeometry(atomRadii['C'], 32, 32),
+                    new THREE.MeshPhongMaterial({ color: atomColors['C'] })
+                );
+                carbon.position.set(x, y, center.z);
+                carbon.userData = { type: 'C' };
+                atoms.push(carbon);
+                moleculeGroup.add(carbon);
+                
+                // 添加碳-碳键
+                if (i > 0) {
+                    addBond(atoms[atoms.length - 2], carbon);
+                }
+            }
+            
+            // 闭合苯环
+            addBond(atoms[atoms.length - 1], atoms[atoms.length - 6]);
+            
+            // 添加氢原子
+            for (let i = 0; i < 6; i++) {
+                const carbon = atoms[atoms.length - 6 + i];
+                const direction = new THREE.Vector3().copy(carbon.position).sub(center).normalize();
+                const hydrogenPos = new THREE.Vector3().copy(carbon.position).add(direction.multiplyScalar(1.09));
+                
+                const hydrogen = new THREE.Mesh(
+                    new THREE.SphereGeometry(atomRadii['H'], 32, 32),
+                    new THREE.MeshPhongMaterial({ color: atomColors['H'] })
+                );
+                hydrogen.position.copy(hydrogenPos);
+                hydrogen.userData = { type: 'H' };
+                atoms.push(hydrogen);
+                moleculeGroup.add(hydrogen);
+                
+                addBond(carbon, hydrogen);
+            }
+            
+            updateMoleculeName();
+            centerMolecule();
+        }
+        
+        // 添加甲基的函数
+        function addMethylGroup() {
+            if (atoms.length === 0) {
+                addAtom('C');
+                return;
+            }
+            
+            const lastAtom = atoms[atoms.length - 1];
+            if (lastAtom.userData.type !== 'C') {
+                alert('甲基只能连接到碳原子上！');
+                return;
+            }
+            
+            // 主碳原子
+            const mainCarbonPos = new THREE.Vector3().copy(lastAtom.position);
+            
+            // 添加甲基碳
+            const methylCarbonPos = new THREE.Vector3().copy(mainCarbonPos);
+            methylCarbonPos.x += bondLengths['C-C'];
+            addAtom('C', methylCarbonPos);
+            
+            // 添加三个氢原子
+            for (let i = 0; i < 3; i++) {
+                const angle = (i * 2 * Math.PI / 3);
+                const hydrogenPos = new THREE.Vector3().copy(methylCarbonPos);
+                hydrogenPos.y += bondLengths['C-H'] * Math.sin(angle);
+                hydrogenPos.z += bondLengths['C-H'] * Math.cos(angle);
+                
+                addAtom('H', hydrogenPos);
+            }
+            
+            updateMoleculeName();
+        }
+        
+        // 添加羟基的函数
+        function addHydroxylGroup() {
+            if (atoms.length === 0) {
+                addAtom('C');
+                return;
+            }
+            
+            const lastAtom = atoms[atoms.length - 1];
+            if (lastAtom.userData.type !== 'C') {
+                alert('羟基只能连接到碳原子上！');
+                return;
+            }
+            
+            // 主碳位置
+            const carbonPos = new THREE.Vector3().copy(lastAtom.position);
+            
+            // 添加氧原子
+            const oxygenPos = new THREE.Vector3().copy(carbonPos);
+            oxygenPos.x += bondLengths['C-O'];
+            addAtom('O', oxygenPos);
+            
+            // 添加氢原子
+            const hydrogenPos = new THREE.Vector3().copy(oxygenPos);
+            hydrogenPos.x += bondLengths['O-H'];
+            addAtom('H', hydrogenPos);
+            
+            updateMoleculeName();
+        }
+        
+        // 旋转分子的函数
+        function rotateMolecule(axis) {
+            const speed = 0.05;
+            
+            const rotate = () => {
+                switch(axis) {
+                    case 'x':
+                        moleculeGroup.rotation.x += speed;
+                        break;
+                    case 'y':
+                        moleculeGroup.rotation.y += speed;
+                        break;
+                    case 'z':
+                        moleculeGroup.rotation.z += speed;
+                        break;
+                }
+                
+                if (moleculeGroup.userData.rotating) {
+                    requestAnimationFrame(rotate);
+                }
+            };
+            
+            // 开始/停止旋转
+            if (moleculeGroup.userData.rotating && moleculeGroup.userData.rotatingAxis === axis) {
+                moleculeGroup.userData.rotating = false;
+            } else {
+                moleculeGroup.userData.rotating = true;
+                moleculeGroup.userData.rotatingAxis = axis;
+                rotate();
+            }
+        }
+        
+        // 居中分子的函数
+        function centerMolecule() {
+            if (atoms.length === 0) return;
+            
+            // 计算分子中心
+            const center = new THREE.Vector3();
+            atoms.forEach(atom => center.add(atom.position));
+            center.divideScalar(atoms.length);
+            
+            // 移动整个分子组
+            moleculeGroup.position.sub(center);
+            controls.target.copy(new THREE.Vector3());
+        }
+        
+        // 清除分子的函数
+        function clearMolecule() {
+            moleculeGroup.remove(...moleculeGroup.children);
+            atoms.length = 0;
+            bonds.length = 0;
+            moleculeGroup.rotation.set(0, 0, 0);
+            moleculeGroup.userData.rotating = false;
+            document.getElementById('compound-name').textContent = '当前分子: 无';
+            centerMolecule();
+        }
+        
+        // 更新分子名称的函数
+        function updateMoleculeName() {
+            const atomCount = {};
+            atoms.forEach(atom => {
+                const type = atom.userData.type;
+                atomCount[type] = (atomCount[type] || 0) + 1;
+            });
+            
+            let name = '';
+            
+            // 检测苯环
+            const carbonCount = atomCount['C'] || 0;
+            const hydrogenCount = atomCount['H'] || 0;
+            if (carbonCount === 6 && hydrogenCount === 6) {
+                name = '苯';
+            } 
+            // 检测甲烷
+            else if (carbonCount === 1 && hydrogenCount === 4) {
+                name = '甲烷';
+            }
+            // 检测乙醇
+            else if (carbonCount === 2 && hydrogenCount === 6 && (atomCount['O'] || 0) === 1) {
+                name = '乙醇';
+            }
+            // 检测甲醇
+            else if (carbonCount === 1 && hydrogenCount === 4 && (atomCount['O'] || 0) === 1) {
+                name = '甲醇';
+            }
+            // 检测氯甲烷
+            else if (carbonCount === 1 && hydrogenCount === 3 && (atomCount['Cl'] || 0) === 1) {
+                name = '氯甲烷';
+            }
+            // 检测溴苯
+            else if (carbonCount === 6 && hydrogenCount === 5 && (atomCount['Br'] || 0) === 1) {
+                name = '溴苯';
+            }
+            // 其他情况
+            else {
+                name = '有机化合物';
+                if (carbonCount > 0) name = `C${carbonCount}化合物`;
+                if (hydrogenCount > 0) name += `H${hydrogenCount}`;
+                if (atomCount['O'] > 0) name += `O${atomCount['O']}`;
+                if (atomCount['N'] > 0) name += `N${atomCount['N']}`;
+                if (atomCount['Cl'] > 0) name += `Cl${atomCount['Cl']}`;
+                if (atomCount['Br'] > 0) name += `Br${atomCount['Br']}`;
+            }
+            
+            document.getElementById('compound-name').textContent = `当前分子: ${name}`;
+        }
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        animate();
+    </script>
+</body>
+</html>

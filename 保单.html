@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加入化圈申请</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info-box {
+            background-color: #e7f5fe;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 5px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>加入化圈申请</h1>
+        
+        <div class="info-box">
+            <p><strong>目标仓库:</strong> Joey862/Joey.github.io</p>
+            <p><strong>文件路径:</strong> /2.csv</p>
+            <p><strong>分支:</strong> main</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="nickname">化圈昵称</label>
+            <input type="text" id="nickname" placeholder="例如: 氯气CL2小王" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="realName">真实姓名(可选)</label>
+            <input type="text" id="realName" placeholder="您的真实姓名">
+        </div>
+        
+        <div class="form-group">
+            <label for="location">所在地区</label>
+            <input type="text" id="location" placeholder="例如: 河南" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="expertise">化学专长领域</label>
+            <select id="expertise" required>
+                <option value="">-- 请选择 --</option>
+                <option value="有机化学">有机化学</option>
+                <option value="无机化学">无机化学</option>
+                <option value="分析化学">分析化学</option>
+                <option value="物理化学">物理化学</option>
+                <option value="生物化学">生物化学</option>
+                <option value="材料化学">材料化学</option>
+                <option value="其他">其他</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="experience">化学相关经验</label>
+            <textarea id="experience" placeholder="请简要描述您的化学学习或工作经历"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="reason">申请加入理由</label>
+            <textarea id="reason" placeholder="请说明您为什么想加入化圈" required></textarea>
+        </div>
+        
+        <button id="submitBtn">提交申请</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        // GitHub个人访问令牌
+        const GITHUB_TOKEN = "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";
+        
+        document.getElementById('submitBtn').addEventListener('click', async function() {
+            const nickname = document.getElementById('nickname').value.trim();
+            const realName = document.getElementById('realName').value.trim();
+            const location = document.getElementById('location').value.trim();
+            const expertise = document.getElementById('expertise').value;
+            const experience = document.getElementById('experience').value.trim();
+            const reason = document.getElementById('reason').value.trim();
+            
+            const statusDiv = document.getElementById('status');
+            
+            // 验证必填字段
+            if (!nickname) {
+                showStatus('错误：请输入化圈昵称', 'error');
+                return;
+            }
+            
+            if (!location) {
+                showStatus('错误：请输入所在地区', 'error');
+                return;
+            }
+            
+            if (!expertise) {
+                showStatus('错误：请选择化学专长领域', 'error');
+                return;
+            }
+            
+            if (!reason) {
+                showStatus('错误：请填写申请加入理由', 'error');
+                return;
+            }
+            
+            showStatus('正在提交申请...', '');
+            
+            try {
+                // 准备CSV数据
+                const timestamp = new Date().toISOString();
+                const csvRow = `"${timestamp}","${nickname}","${realName}","${location}","${expertise}","${experience}","${reason}"`;
+                
+                // 1. 获取文件当前SHA（用于更新）
+                const getUrl = 'https://api.github.com/repos/Joey862/Joey.github.io/contents/2.csv?ref=main';
+                const getResponse = await fetch(getUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'User-Agent': 'HuaCircleApplication/1.0'
+                    }
+                });
+                
+                let sha;
+                let existingContent = '';
+                
+                if (getResponse.ok) {
+                    const fileData = await getResponse.json();
+                    sha = fileData.sha;
+                    existingContent = atob(fileData.content.replace(/\s/g, ''));
+                } else if (getResponse.status === 404) {
+                    sha = null; // 文件不存在，将创建新文件
+                    existingContent = '时间戳,昵称,真实姓名,地区,专长领域,经验,申请理由\n';
+                } else {
+                    const errorData = await getResponse.json();
+                    throw new Error(`获取文件信息失败: ${errorData.message} (状态码: ${getResponse.status})`);
+                }
+                
+                // 2. 更新文件（追加新数据）
+                const newContent = existingContent + csvRow + '\n';
+                const encodedContent = btoa(unescape(encodeURIComponent(newContent)));
+                
+                const updateUrl = 'https://api.github.com/repos/Joey862/Joey.github.io/contents/2.csv';
+                const updateResponse = await fetch(updateUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/vnd.github.v3+json',
+                        'User-Agent': 'HuaCircleApplication/1.0'
+                    },
+                    body: JSON.stringify({
+                        message: `新增化圈申请: ${nickname}`,
+                        content: encodedContent,
+                        sha: sha,
+                        branch: 'main'
+                    })
+                });
+                
+                if (!updateResponse.ok) {
+                    const errorData = await updateResponse.json();
+                    throw new Error(`提交申请失败: ${errorData.message} (状态码: ${updateResponse.status})`);
+                }
+                
+                showStatus('申请提交成功！感谢您的申请', 'success');
+                // 清空表单
+                document.getElementById('nickname').value = '';
+                document.getElementById('realName').value = '';
+                document.getElementById('location').value = '';
+                document.getElementById('expertise').value = '';
+                document.getElementById('experience').value = '';
+                document.getElementById('reason').value = '';
+            } catch (error) {
+                showStatus(`错误: ${error.message}`, 'error');
+                console.error('提交错误:', error);
+            }
+        });
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+            
+            if (type === 'success') {
+                statusDiv.className = 'success';
+            } else if (type === 'error') {
+                statusDiv.className = 'error';
+            } else {
+                statusDiv.className = '';
+            }
+        }
+    </script>
+</body>
+</html>
